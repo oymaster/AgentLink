@@ -1,0 +1,53 @@
+# Build
+build/
+build-*/
+out/
+cmake-build-*/
+tools/*/dist/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.exe
+*.out
+*.app
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# IDE
+.idea/
+.vscode/
+node_modules/
+*.swp
+*.swo
+*~
+
+# Runtime / logs
+logs/
+*.log
+pids/
+*.pid
+*.pcap
+
+# Local config (API keys, etc.)
+.env
+.env.*
+!.env.example
+*.local
+config.local.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.bak
+cppcheck-report.*

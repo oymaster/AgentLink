@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "agentlink": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/AgentLink/tools/agentlink-mcp-server/dist/index.js"
+      ],
+      "env": {
+        "AGENTLINK_REGISTRY_URL": "http://localhost:8500",
+        "AGENTLINK_MESSAGES_URL": "http://localhost:5002/v1/messages",
+        "AGENTLINK_REDIS_URL": "redis://127.0.0.1:6379",
+        "AGENTLINK_TIMEOUT_MS": "10000"
+      }
+    }
+  }
+}
