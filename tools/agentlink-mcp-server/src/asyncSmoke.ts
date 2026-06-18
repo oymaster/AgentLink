@@ -1,6 +1,5 @@
 import { AgentLinkClient } from "./agentlinkClient.js";
 import { loadConfig } from "./config.js";
-import { RedisEventLog } from "./taskEvents.js";
 import { TaskRuntime } from "./taskRuntime.js";
 
 // Exercises the async task lifecycle end to end:
@@ -8,8 +7,7 @@ import { TaskRuntime } from "./taskRuntime.js";
 // Requires a running registry + remote agent + Redis (same as the C++ demo).
 const config = loadConfig();
 const client = new AgentLinkClient(config);
-const eventLog = new RedisEventLog(config.redisUrl);
-const runtime = new TaskRuntime(client, eventLog);
+const runtime = new TaskRuntime(client);
 
 const skill = process.env.AGENTLINK_SMOKE_SKILL ?? "math";
 const message = process.env.AGENTLINK_SMOKE_MESSAGE ?? "21 * 2";
@@ -43,14 +41,11 @@ try {
     )
   );
 
-  await eventLog.close();
-
   if (view.state !== "completed") {
     console.error(`Task did not complete, final state: ${view.state}`);
     process.exit(1);
   }
 } catch (error) {
   console.error(error);
-  await eventLog.close().catch(() => undefined);
   process.exit(1);
 }

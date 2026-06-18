@@ -54,6 +54,7 @@ async function stopServer(server: Server): Promise<void> {
     return;
   }
 
+  server.closeAllConnections();
   await new Promise<void>((resolve, reject) => {
     server.close((error) => {
       if (error) {
@@ -65,12 +66,12 @@ async function stopServer(server: Server): Promise<void> {
   });
 }
 
-async function createMcpSession(registryUrl: string): Promise<McpSession> {
+async function createMcpSession(gatewayUrl: string): Promise<McpSession> {
   const child = spawn(process.execPath, ["dist/index.js"], {
     cwd: process.cwd(),
     env: {
       ...process.env,
-      AGENTLINK_REGISTRY_URL: registryUrl,
+      AGENTLINK_GATEWAY_URL: gatewayUrl,
       AGENTLINK_TIMEOUT_MS: "2000"
     },
     stdio: ["pipe", "pipe", "pipe"]
@@ -111,7 +112,7 @@ async function createMcpSession(registryUrl: string): Promise<McpSession> {
     capabilities: {},
     clientInfo: {
       name: "agentlink-mcp-error-smoke",
-      version: "0.1.0"
+      version: "0.2.0"
     }
   });
   if (initialized.error) {
@@ -169,7 +170,7 @@ async function registryUnavailableCase(): Promise<void> {
         name: "agentlink_list_agents",
         arguments: {}
       },
-      "http_error"
+      "registry unavailable"
     );
   } finally {
     await session.close();
@@ -179,11 +180,7 @@ async function registryUnavailableCase(): Promise<void> {
 
 async function skillMissingCase(): Promise<void> {
   const { server, url } = await startServer((_request, response) => {
-    jsonResponse(response, 200, {
-      success: true,
-      agents: [],
-      count: 0
-    });
+    jsonResponse(response, 502, { error: "agent_not_found" });
   });
   const session = await createMcpSession(url);
 
@@ -207,28 +204,11 @@ async function skillMissingCase(): Promise<void> {
 }
 
 async function malformedAgentCase(): Promise<void> {
-  const agent = await startServer((_request, response) => {
+  const gateway = await startServer((_request, response) => {
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end("{not-json");
   });
-  const registry = await startServer((_request, response) => {
-    jsonResponse(response, 200, {
-      success: true,
-      agents: [
-        {
-          id: "bad-agent",
-          name: "Bad Agent",
-          address: agent.url,
-          tags: ["math"],
-          skills: [{ name: "math" }],
-          health: "healthy",
-          load: 0
-        }
-      ],
-      count: 1
-    });
-  });
-  const session = await createMcpSession(registry.url);
+  const session = await createMcpSession(gateway.url);
 
   try {
     await expectToolError(
@@ -241,15 +221,39 @@ async function malformedAgentCase(): Promise<void> {
           message: "21 * 2"
         }
       },
-      "request_failed"
+      "invalid_response"
     );
   } finally {
     await session.close();
-    await stopServer(registry.server);
-    await stopServer(agent.server);
+    await stopServer(gateway.server);
+  }
+}
+
+async function messagesNotImplementedCase(): Promise<void> {
+  const gateway = await startServer((_request, response) => {
+    jsonResponse(response, 501, { error: "not_implemented" });
+  });
+  const session = await createMcpSession(gateway.url);
+
+  try {
+    await expectToolError(
+      "messages_not_implemented",
+      session,
+      {
+        name: "agentlink_send_message",
+        arguments: {
+          message: "hello"
+        }
+      },
+      "not_implemented"
+    );
+  } finally {
+    await session.close();
+    await stopServer(gateway.server);
   }
 }
 
 await registryUnavailableCase();
 await skillMissingCase();
 await malformedAgentCase();
+await messagesNotImplementedCase();

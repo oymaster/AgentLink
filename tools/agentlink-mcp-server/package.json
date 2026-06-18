@@ -1,6 +1,6 @@
 {
   "name": "@agentlink/mcp-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -12,11 +12,11 @@
     "smoke": "node dist/smoke.js",
     "mcp:smoke": "node dist/mcpSmoke.js",
     "mcp:smoke:error": "node dist/mcpErrorSmoke.js",
-    "async:smoke": "node dist/asyncSmoke.js"
+    "async:smoke": "node dist/asyncSmoke.js",
+    "async:demo": "node dist/mcpAsyncDemo.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "ioredis": "^5.11.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {

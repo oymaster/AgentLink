@@ -14,30 +14,9 @@ export interface AgentRegistration {
   address: string;
   tags?: string[];
   skills?: AgentSkill[];
-  input_modes?: string[];
-  output_modes?: string[];
-  capabilities?: Record<string, boolean>;
   health?: string;
   load?: number;
-  version?: string;
-  platform?: string;
-  runtime?: string;
-}
-
-export interface AgentListResponse {
-  success?: boolean;
-  agents?: AgentRegistration[];
-  count?: number;
-  error?: string;
-}
-
-export interface SendMessageResult {
-  id?: string;
-  type?: string;
-  role?: string;
-  model?: string;
-  content?: unknown;
-  raw: unknown;
+  capabilities?: Record<string, boolean>;
 }
 
 export interface CallAgentResult {
@@ -58,11 +37,7 @@ export interface AgentSummary {
 }
 
 export class AgentLinkError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly details?: unknown
-  ) {
+  constructor(message: string, public readonly code: string, public readonly details?: unknown) {
     super(message);
     this.name = "AgentLinkError";
   }
@@ -72,158 +47,84 @@ export class AgentLinkClient {
   constructor(private readonly config: AgentLinkConfig) {}
 
   async listAgents(): Promise<AgentRegistration[]> {
-    const response = await this.requestJson<AgentListResponse>(`${this.config.registryUrl}/v1/agents`, {
+    const response = await this.requestJson<{ agents?: AgentRegistration[] }>(`${this.config.gatewayUrl}/v1/agents`, {
       method: "GET"
     });
-
-    if (response.success === false) {
-      throw new AgentLinkError(response.error ?? "registry returned failure", "registry_error", response);
-    }
-
     return response.agents ?? [];
   }
 
   async findAgents(query: { skill?: string; tag?: string }): Promise<AgentRegistration[]> {
-    if (!query.skill && !query.tag) {
-      return this.listAgents();
-    }
-
-    const path = query.skill ? "/v1/agent/find_by_skill" : "/v1/agent/find";
-    const body = query.skill ? { skill: query.skill } : { tag: query.tag };
-    const response = await this.requestJson<AgentListResponse>(`${this.config.registryUrl}${path}`, {
+    const response = await this.requestJson<{ agents?: AgentRegistration[] }>(`${this.config.gatewayUrl}/v1/agents/find`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify(query)
     });
-
-    if (response.success === false) {
-      throw new AgentLinkError(response.error ?? "registry returned failure", "registry_error", response);
-    }
-
     return response.agents ?? [];
   }
 
-  async sendMessage(input: {
-    message: string;
-    model?: string;
-    system?: string;
-    metadata?: Record<string, string>;
-    maxTokens?: number;
-  }): Promise<SendMessageResult> {
-    const body = {
-      model: input.model ?? "agentlink-mcp",
-      system: input.system,
-      max_tokens: input.maxTokens ?? 1024,
-      metadata: input.metadata,
-      messages: [
-        {
-          role: "user",
-          content: input.message
-        }
-      ]
-    };
-
+  async sendMessage(input: { message: string; model?: string; system?: string; maxTokens?: number }): Promise<{ raw: unknown }> {
     const raw = await this.requestJson<unknown>(this.config.messagesUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify(input)
     });
-
-    return {
-      ...(typeof raw === "object" && raw !== null ? raw : {}),
-      raw
-    } as SendMessageResult;
+    return { raw };
   }
 
-  async callAgent(input: {
-    skill: string;
-    message: string;
-    tag?: string;
-    historyLength?: number;
-  }): Promise<CallAgentResult> {
-    const agents = await this.findAgents({ skill: input.skill });
-    const selected = this.selectAgent(agents, input.tag);
-    if (!selected) {
-      throw new AgentLinkError(`No healthy agent found for skill: ${input.skill}`, "agent_not_found", {
-        skill: input.skill,
-        tag: input.tag,
-        agents
-      });
+  async callAgent(input: { skill: string; message: string; tag?: string; historyLength?: number }): Promise<CallAgentResult> {
+    const raw = await this.requestJson<{ selectedAgent: AgentRegistration; answer: string }>(
+      `${this.config.gatewayUrl}/v1/call`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input)
+      },
+      this.config.callTimeoutMs
+    );
+    if (!isRecord(raw) || !isRecord(raw.selectedAgent) || typeof raw.answer !== "string") {
+      throw new AgentLinkError("Gateway returned an invalid call response", "invalid_response", raw);
     }
-
-    const { answer, raw } = await this.invokeAgent(selected, input.message, input.historyLength);
-    return { selectedAgent: selected, answer, raw };
+    return { ...raw, raw };
   }
 
-  // Send an A2A message/send to an already-selected agent.
-  async invokeAgent(
-    agent: AgentRegistration,
-    message: string,
-    historyLength?: number
-  ): Promise<{ answer: string; raw: unknown }> {
-    const messageId = `mcp-msg-${Date.now()}`;
-    const requestId = `mcp-rpc-${Date.now()}`;
-    const rpc = {
-      jsonrpc: "2.0",
-      id: requestId,
-      method: "message/send",
-      params: {
-        message: {
-          messageId,
-          role: "user",
-          parts: [
-            {
-              kind: "text",
-              text: message
-            }
-          ]
-        },
-        historyLength: historyLength ?? 0
-      }
-    };
-
-    const raw = await this.requestJson<unknown>(agent.address, {
+  async createTask(input: { skill?: string; message: string; tag?: string }): Promise<unknown> {
+    return this.requestJson(`${this.config.gatewayUrl}/v1/tasks`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(rpc)
+      body: JSON.stringify(input)
     });
-
-    return { answer: extractA2AText(raw), raw };
   }
 
-  selectAgent(agents: AgentRegistration[], tag?: string): AgentRegistration | undefined {
-    const candidates = agents
-      .filter((agent) => !tag || (agent.tags ?? []).includes(tag))
-      .filter((agent) => !agent.health || agent.health === "healthy" || agent.health === "unknown")
-      .sort((lhs, rhs) => (lhs.load ?? 0) - (rhs.load ?? 0));
-
-    return candidates[0];
+  async getTask(taskId: string): Promise<unknown> {
+    return this.requestJson(`${this.config.gatewayUrl}/v1/tasks/${encodeURIComponent(taskId)}`, { method: "GET" });
   }
 
-  private async requestJson<T>(url: string, init: RequestInit): Promise<T> {
+  async streamTask(taskId: string, sinceSequence: number): Promise<unknown> {
+    return this.requestJson(
+      `${this.config.gatewayUrl}/v1/tasks/${encodeURIComponent(taskId)}/events?since=${sinceSequence}`,
+      { method: "GET" }
+    );
+  }
+
+  async cancelTask(taskId: string): Promise<unknown> {
+    return this.requestJson(`${this.config.gatewayUrl}/v1/tasks/${encodeURIComponent(taskId)}/cancel`, { method: "POST" });
+  }
+
+  private async requestJson<T>(url: string, init: RequestInit, timeoutMs = this.config.requestTimeoutMs): Promise<T> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
-
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(url, {
-        ...init,
-        signal: controller.signal
-      });
+      const response = await fetch(url, { ...init, signal: controller.signal });
       const text = await response.text();
-
+      const details = text ? safeJson(text) : undefined;
       if (!response.ok) {
-        throw new AgentLinkError(`HTTP ${response.status} from ${url}`, "http_error", text);
+        const upstreamCode = isRecord(details) && typeof details.error === "string" ? details.error : undefined;
+        const code = response.status === 501 ? "not_implemented" : upstreamCode ?? "http_error";
+        throw new AgentLinkError(`HTTP ${response.status} from ${url}`, code, details);
       }
-
-      if (!text) {
-        return undefined as T;
-      }
-
-      return JSON.parse(text) as T;
+      return details as T;
     } catch (error) {
-      if (error instanceof AgentLinkError) {
-        throw error;
-      }
+      if (error instanceof AgentLinkError) throw error;
       throw new AgentLinkError(`Failed to request ${url}: ${(error as Error).message}`, "request_failed", error);
     } finally {
       clearTimeout(timeout);
@@ -244,27 +145,8 @@ export function summarizeAgents(agents: AgentRegistration[]): AgentSummary[] {
   }));
 }
 
-function extractA2AText(raw: unknown): string {
-  if (!isRecord(raw)) {
-    return "";
-  }
-
-  const result = raw.result;
-  if (!isRecord(result)) {
-    return "";
-  }
-
-  const parts = result.parts;
-  if (!Array.isArray(parts)) {
-    return "";
-  }
-
-  const textPart = parts.find((part) => isRecord(part) && part.kind === "text");
-  if (!isRecord(textPart) || typeof textPart.text !== "string") {
-    return "";
-  }
-
-  return textPart.text;
+function safeJson(text: string): unknown {
+  try { return JSON.parse(text); } catch { return text; }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

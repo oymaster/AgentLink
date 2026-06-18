@@ -10,7 +10,7 @@ try {
   const agents = await client.findAgents({ skill });
   console.log(JSON.stringify({
     step: "find_agents",
-    registryUrl: config.registryUrl,
+    gatewayUrl: config.gatewayUrl,
     count: agents.length,
     agents: summarizeAgents(agents)
   }, null, 2));

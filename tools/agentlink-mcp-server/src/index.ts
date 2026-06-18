@@ -5,17 +5,15 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { AgentLinkClient, AgentLinkError, summarizeAgents } from "./agentlinkClient.js";
 import { loadConfig } from "./config.js";
-import { RedisEventLog } from "./taskEvents.js";
 import { TaskRuntime } from "./taskRuntime.js";
 
 const config = loadConfig();
 const client = new AgentLinkClient(config);
-const eventLog = new RedisEventLog(config.redisUrl);
-const taskRuntime = new TaskRuntime(client, eventLog);
+const taskRuntime = new TaskRuntime(client);
 
 const server = new McpServer({
   name: "agentlink-mcp-server",
-  version: "0.1.0"
+  version: "0.2.0"
 });
 
 function textResult(payload: unknown) {
@@ -48,7 +46,7 @@ server.tool(
     try {
       const agents = await client.listAgents();
       return textResult({
-        registryUrl: config.registryUrl,
+        gatewayUrl: config.gatewayUrl,
         count: agents.length,
         agents: summarizeAgents(agents)
       });
@@ -69,7 +67,7 @@ server.tool(
     try {
       const agents = await client.findAgents({ skill, tag });
       return textResult({
-        registryUrl: config.registryUrl,
+        gatewayUrl: config.gatewayUrl,
         query: { skill, tag },
         count: agents.length,
         agents: summarizeAgents(agents)
@@ -129,7 +127,7 @@ server.tool(
   "agentlink_create_task",
   "Create an async AgentLink task: dispatch to a remote agent in the background and return a task handle immediately (non-blocking). Use agentlink_get_task / agentlink_stream_task to follow progress.",
   {
-    skill: z.string().describe("Skill name used for Registry lookup, e.g. math."),
+    skill: z.string().optional().describe("Optional exact skill; omit to use semantic routing."),
     message: z.string().describe("User message sent to the selected agent."),
     tag: z.string().optional().describe("Optional tag filter applied after skill lookup.")
   },

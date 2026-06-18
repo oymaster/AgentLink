@@ -9,7 +9,7 @@ type JsonRpcResponse = {
   error?: unknown;
 };
 
-const registryUrl = process.env.AGENTLINK_REGISTRY_URL ?? "http://localhost:8500";
+const gatewayUrl = process.env.AGENTLINK_GATEWAY_URL ?? "http://localhost:5002";
 const message = process.env.AGENTLINK_SMOKE_MESSAGE ?? "21 * 2";
 const skill = process.env.AGENTLINK_SMOKE_SKILL ?? "math";
 
@@ -17,7 +17,7 @@ const child = spawn(process.execPath, ["dist/index.js"], {
   cwd: process.cwd(),
   env: {
     ...process.env,
-    AGENTLINK_REGISTRY_URL: registryUrl
+    AGENTLINK_GATEWAY_URL: gatewayUrl
   },
   stdio: ["pipe", "pipe", "pipe"]
 });
@@ -72,7 +72,7 @@ try {
     capabilities: {},
     clientInfo: {
       name: "agentlink-mcp-smoke",
-      version: "0.1.0"
+      version: "0.2.0"
     }
   });
   assertNoError("initialize", initialized);
