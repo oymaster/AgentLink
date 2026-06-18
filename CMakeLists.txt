@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
-project(a2a-cpp VERSION 1.0.0 LANGUAGES CXX)
+project(AgentLink VERSION 0.2.0 LANGUAGES CXX)
 
 # C++ Standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -10,10 +10,23 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(BUILD_EXAMPLES "Build example applications" ON)
 option(BUILD_TESTS "Build unit tests" ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(BUILD_GATEWAY "Build the Boost.Asio/Beast coroutine gateway" ON)
 
 # Find dependencies
 find_package(CURL REQUIRED)
 find_package(Threads REQUIRED)
+
+# Gateway dependencies (Boost.Asio + Beast are header-only; Boost.System is
+# header-only in modern Boost, so no compiled components are requested. hiredis
+# via pkg-config.)
+if(BUILD_GATEWAY)
+    if(POLICY CMP0167)
+        cmake_policy(SET CMP0167 NEW)  # use upstream BoostConfig, not the removed FindBoost
+    endif()
+    find_package(Boost 1.81 REQUIRED)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(HIREDIS REQUIRED IMPORTED_TARGET hiredis)
+endif()
 
 # Include directories
 include_directories(${PROJECT_SOURCE_DIR}/include)
@@ -62,6 +75,7 @@ set(A2A_HEADERS
     include/a2a/core/jsonrpc_request.hpp
     include/a2a/core/jsonrpc_response.hpp
     include/a2a/core/http_client.hpp
+    include/a2a/version.hpp
     
     # Models
     include/a2a/models/message_part.hpp
@@ -113,6 +127,11 @@ if(MSVC)
     target_compile_options(a2a PRIVATE /W4)
 else()
     target_compile_options(a2a PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+# Gateway
+if(BUILD_GATEWAY)
+    add_subdirectory(src/gateway)
 endif()
 
 # Examples

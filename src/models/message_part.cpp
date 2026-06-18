@@ -1,4 +1,5 @@
 #include <a2a/models/message_part.hpp>
+#include <json.hpp>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -114,52 +115,17 @@ std::string DataPart::to_json() const {
 
 // Part factory method
 std::unique_ptr<Part> Part::from_json(const std::string& json) {
-    // Simplified parsing - in production use nlohmann/json
-    
-    // Determine kind
-    size_t kind_pos = json.find("\"kind\":");
-    if (kind_pos == std::string::npos) {
-        return nullptr;
-    }
-    
-    size_t kind_start = json.find("\"", kind_pos + 7) + 1;
-    size_t kind_end = json.find("\"", kind_start);
-    std::string kind = json.substr(kind_start, kind_end - kind_start);
-    
+    const auto parsed = nlohmann::json::parse(json);
+    const auto kind = parsed.value("kind", "");
     if (kind == "text") {
-        size_t text_pos = json.find("\"text\":");
-        if (text_pos != std::string::npos) {
-            size_t text_start = json.find("\"", text_pos + 7) + 1;
-            size_t text_end = json.find("\"", text_start);
-            std::string text = json.substr(text_start, text_end - text_start);
-            return std::make_unique<TextPart>(text);
-        }
+        return std::make_unique<TextPart>(parsed.value("text", ""));
     } else if (kind == "file") {
-        // Simplified file parsing
-        return std::make_unique<FilePart>("file.dat", "application/octet-stream", std::vector<uint8_t>());
+        const auto file = parsed.value("file", nlohmann::json::object());
+        return std::make_unique<FilePart>(file.value("filename", "file.dat"),
+            file.value("mimeType", "application/octet-stream"), std::vector<uint8_t>());
     } else if (kind == "data") {
-        size_t data_pos = json.find("\"data\":");
-        if (data_pos != std::string::npos) {
-            size_t data_start = data_pos + 7;
-            size_t brace_count = 0;
-            size_t data_end = data_start;
-            
-            for (size_t i = data_start; i < json.length(); ++i) {
-                if (json[i] == '{' || json[i] == '[') brace_count++;
-                else if (json[i] == '}' || json[i] == ']') {
-                    if (brace_count > 0) brace_count--;
-                    else {
-                        data_end = i;
-                        break;
-                    }
-                }
-            }
-            
-            std::string data = json.substr(data_start, data_end - data_start);
-            return std::make_unique<DataPart>(data);
-        }
+        return std::make_unique<DataPart>(parsed.value("data", nlohmann::json::object()).dump());
     }
-    
     return nullptr;
 }
 

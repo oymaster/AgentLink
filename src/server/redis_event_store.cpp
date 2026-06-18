@@ -1,4 +1,4 @@
-#include "redis_event_store.hpp"
+#include <a2a/server/redis_event_store.hpp>
 #include <cstdarg>
 #include <iostream>
 #include <stdexcept>
@@ -6,8 +6,7 @@
 namespace a2a {
 
 RedisEventStore::RedisEventStore(const std::string& host, int port)
-    : host_(host)
-    , port_(port) {
+    : host_(host), port_(port) {
     context_ = redisConnect(host.c_str(), port);
     if (context_ == nullptr || context_->err) {
         std::string error = context_ ? context_->errstr : "unable to allocate redis context";
@@ -20,22 +19,23 @@ RedisEventStore::RedisEventStore(const std::string& host, int port)
 }
 
 RedisEventStore::~RedisEventStore() {
-    if (context_) {
-        redisFree(context_);
-    }
+    if (context_) redisFree(context_);
 }
 
 void RedisEventStore::append_event(const TaskEvent& event) {
+    // Sequence assignment and RPUSH are not one Redis transaction. Gateway
+    // correctness relies on EventStoreExecutor serializing every write on its
+    // single hiredis-owning worker. Multiple Gateway writers would require a
+    // Lua append or Redis Stream ID instead. Task/trace dual writes are also
+    // intentionally non-transactional in this release.
     auto stored = event;
     if (stored.sequence() <= 0) {
         const auto existing = list_events(stored.task_id());
         stored.set_sequence(static_cast<long long>(existing.size() + 1));
     }
-
     const auto json = stored.to_json();
-    auto reply = command("RPUSH %s %b", task_key(stored.task_id()).c_str(), json.data(), json.size());
+    auto* reply = command("RPUSH %s %b", task_key(stored.task_id()).c_str(), json.data(), json.size());
     freeReplyObject(reply);
-
     reply = command("RPUSH %s %b", trace_key(stored.trace_id()).c_str(), json.data(), json.size());
     freeReplyObject(reply);
 }
@@ -50,9 +50,7 @@ std::vector<TaskEvent> RedisEventStore::list_events_by_trace(const std::string& 
 
 std::optional<TaskEvent> RedisEventStore::get_latest_event(const std::string& task_id) {
     auto events = list_events(task_id);
-    if (events.empty()) {
-        return std::nullopt;
-    }
+    if (events.empty()) return std::nullopt;
     return events.back();
 }
 
@@ -65,15 +63,11 @@ std::string RedisEventStore::trace_key(const std::string& trace_id) const {
 }
 
 void RedisEventStore::ensure_connection() {
-    if (context_ && !context_->err) {
-        return;
-    }
-
+    if (context_ && !context_->err) return;
     if (context_) {
         redisFree(context_);
         context_ = nullptr;
     }
-
     context_ = redisConnect(host_.c_str(), port_);
     if (context_ == nullptr || context_->err) {
         throw std::runtime_error("RedisEventStore reconnect failed");
@@ -83,44 +77,33 @@ void RedisEventStore::ensure_connection() {
 redisReply* RedisEventStore::command(const char* format, ...) {
     std::lock_guard<std::mutex> lock(mutex_);
     ensure_connection();
-
     va_list args;
     va_start(args, format);
     auto* reply = static_cast<redisReply*>(redisvCommand(context_, format, args));
     va_end(args);
-
-    if (reply == nullptr) {
-        throw std::runtime_error("RedisEventStore command failed");
-    }
-
+    if (reply == nullptr) throw std::runtime_error("RedisEventStore command failed");
     if (reply->type == REDIS_REPLY_ERROR) {
         std::string error = reply->str ? reply->str : "unknown redis error";
         freeReplyObject(reply);
         throw std::runtime_error("RedisEventStore error: " + error);
     }
-
     return reply;
 }
 
 std::vector<TaskEvent> RedisEventStore::read_list(const std::string& key) {
     std::vector<TaskEvent> events;
     auto* reply = command("LRANGE %s 0 -1", key.c_str());
-
     if (reply->type == REDIS_REPLY_ARRAY) {
         for (size_t i = 0; i < reply->elements; ++i) {
             const auto* item = reply->element[i];
-            if (item->type != REDIS_REPLY_STRING) {
-                continue;
-            }
-
+            if (item->type != REDIS_REPLY_STRING) continue;
             try {
                 events.push_back(TaskEvent::from_json(std::string(item->str, item->len)));
-            } catch (const std::exception& e) {
-                std::cerr << "[RedisEventStore] skip malformed event: " << e.what() << std::endl;
+            } catch (const std::exception& error) {
+                std::cerr << "[RedisEventStore] skip malformed event: " << error.what() << std::endl;
             }
         }
     }
-
     freeReplyObject(reply);
     return events;
 }

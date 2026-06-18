@@ -16,7 +16,7 @@ long long now_ms() {
 }
 
 std::string make_id(const std::string& prefix) {
-    static std::mt19937_64 rng(std::random_device{}());
+    thread_local std::mt19937_64 rng(std::random_device{}());
     std::uniform_int_distribution<unsigned long long> dist;
     std::ostringstream oss;
     oss << prefix << "-" << now_ms() << "-" << std::hex << dist(rng);

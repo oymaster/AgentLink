@@ -5,6 +5,7 @@
 #include <a2a/core/jsonrpc_response.hpp>
 #include <a2a/models/agent_message.hpp>
 #include <a2a/models/message_part.hpp>
+#include <a2a/version.hpp>
 #include <cstdlib>
 #include <cstdio>
 #include <iostream>
@@ -133,7 +134,7 @@ private:
         registration.input_modes = {"text"};
         registration.output_modes = {"text"};
         registration.capabilities = {{"task_management", true}, {"streaming", false}};
-        registration.version = "1.0-adapter";
+        registration.version = std::string(a2a::kVersion);
         registration.platform = "local";
         registration.runtime = is_mock_command(command_) ? "agentlink-cli-mock" : "agentlink-cli-adapter";
         registration.health = "healthy";
@@ -165,6 +166,8 @@ private:
             std::string answer;
 
             if (is_mock_command(command_)) {
+                const auto delay_ms = std::max(0, std::stoi(getenv_or_default("AGENTLINK_CLI_MOCK_DELAY_MS", "0")));
+                if (delay_ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
                 answer = "[" + agent_id_ + " / " + skill_ + "]\n角色: " + role_prompt_ + "\n处理: " + user_text;
             } else {
                 answer = run_command_with_prompt(command_, prompt);
@@ -192,7 +195,7 @@ private:
         json card = {
             {"name", name_},
             {"description", "Local CLI-backed AgentLink role agent prototype"},
-            {"version", "1.0-adapter"},
+            {"version", std::string(a2a::kVersion)},
             {"capabilities", {
                 {"streaming", false},
                 {"push_notifications", false},

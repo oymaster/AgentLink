@@ -55,6 +55,15 @@ void test_task_envelope_roundtrip() {
     assert(parsed.metadata().at("transport") == "http_jsonrpc");
 }
 
+void test_agent_message_structured_json_roundtrip() {
+    const std::string text = "[architect] says: \"use C++\"\nnext stage";
+    const auto message = a2a::AgentMessage::create()
+        .with_role(a2a::MessageRole::User)
+        .with_text(text);
+    const auto parsed = a2a::AgentMessage::from_json(message.to_json());
+    assert(parsed.get_text() == text);
+}
+
 void test_task_event_store() {
     a2a::MemoryEventStore store;
 
@@ -111,6 +120,7 @@ void test_agent_descriptor_and_router() {
 
 int main() {
     test_task_envelope_roundtrip();
+    test_agent_message_structured_json_roundtrip();
     test_task_event_store();
     test_agent_descriptor_and_router();
 

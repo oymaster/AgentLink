@@ -8,19 +8,22 @@ BASE_PORT="${AGENTLINK_CLI_DEMO_BASE_PORT:-28650}"
 REGISTRY_PORT="$BASE_PORT"
 CODEX_PORT="$((BASE_PORT + 1))"
 CLAUDE_PORT="$((BASE_PORT + 2))"
+GATEWAY_PORT="$((BASE_PORT + 3))"
 WORK_DIR="${TMPDIR:-/tmp}/agentlink-cli-role-demo-$$"
 REGISTRY_LOG="$WORK_DIR/registry.log"
 CODEX_LOG="$WORK_DIR/codex-agent.log"
 CLAUDE_LOG="$WORK_DIR/claude-agent.log"
+GATEWAY_LOG="$WORK_DIR/gateway.log"
 
 mkdir -p "$WORK_DIR"
 
 REGISTRY_PID=""
 CODEX_PID=""
 CLAUDE_PID=""
+GATEWAY_PID=""
 
 cleanup() {
-  for pid in "$CLAUDE_PID" "$CODEX_PID" "$REGISTRY_PID"; do
+  for pid in "$GATEWAY_PID" "$CLAUDE_PID" "$CODEX_PID" "$REGISTRY_PID"; do
     if [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1; then
       kill "$pid" >/dev/null 2>&1 || true
       wait "$pid" >/dev/null 2>&1 || true
@@ -38,6 +41,8 @@ fail() {
   [ -f "$CODEX_LOG" ] && cat "$CODEX_LOG" >&2
   echo "--- claude-agent.log ---" >&2
   [ -f "$CLAUDE_LOG" ] && cat "$CLAUDE_LOG" >&2
+  echo "--- gateway.log ---" >&2
+  [ -f "$GATEWAY_LOG" ] && cat "$GATEWAY_LOG" >&2
   exit 1
 }
 
@@ -62,7 +67,9 @@ wait_for_log() {
 
 [ -x "$BUILD_DIR/examples/multi_agent_demo/registry_server" ] || fail "registry_server not found, run: cmake --build $BUILD_DIR"
 [ -x "$BUILD_DIR/examples/multi_agent_demo/cli_agent_server" ] || fail "cli_agent_server not found, run: cmake --build $BUILD_DIR"
+[ -x "$BUILD_DIR/src/gateway/gateway_server" ] || fail "gateway_server not found, run: cmake --build $BUILD_DIR"
 [ -f "$MCP_DIR/dist/mcpSmoke.js" ] || fail "MCP server dist missing, run: cd $MCP_DIR && npm run build"
+redis-cli ping 2>/dev/null | grep -q PONG || fail "Redis is required and did not answer PONG"
 
 "$BUILD_DIR/examples/multi_agent_demo/registry_server" "$REGISTRY_PORT" >"$REGISTRY_LOG" 2>&1 &
 REGISTRY_PID="$!"
@@ -82,6 +89,11 @@ wait_for_log "codex-architect listening" "$CODEX_LOG" 5 || fail "codex role agen
 CLAUDE_PID="$!"
 wait_for_log "claude-implementer listening" "$CLAUDE_LOG" 5 || fail "claude role agent did not start"
 
+AGENTLINK_GATEWAY_PORT="$GATEWAY_PORT" AGENTLINK_REGISTRY_URL="http://localhost:$REGISTRY_PORT" \
+  "$BUILD_DIR/src/gateway/gateway_server" >"$GATEWAY_LOG" 2>&1 &
+GATEWAY_PID="$!"
+wait_for_log "Gateway listening" "$GATEWAY_LOG" 10 || fail "gateway did not start"
+
 sleep 0.2
 
 echo "== registered agents =="
@@ -91,7 +103,7 @@ echo
 echo "== call codex-architect via MCP =="
 (
   cd "$MCP_DIR" || exit 1
-  AGENTLINK_REGISTRY_URL="http://localhost:$REGISTRY_PORT" \
+  AGENTLINK_GATEWAY_URL="http://localhost:$GATEWAY_PORT" \
   AGENTLINK_SMOKE_SKILL=architecture \
   AGENTLINK_SMOKE_MESSAGE="请为 AgentLink 增加 CLI agent adapter 设计一个最小方案。" \
     node dist/mcpSmoke.js
@@ -100,7 +112,7 @@ echo "== call codex-architect via MCP =="
 echo "== call claude-implementer via MCP =="
 (
   cd "$MCP_DIR" || exit 1
-  AGENTLINK_REGISTRY_URL="http://localhost:$REGISTRY_PORT" \
+  AGENTLINK_GATEWAY_URL="http://localhost:$GATEWAY_PORT" \
   AGENTLINK_SMOKE_SKILL=coding \
   AGENTLINK_SMOKE_MESSAGE="请根据架构方案实现 CLI agent adapter，并列出验证命令。" \
     node dist/mcpSmoke.js

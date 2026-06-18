@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <cstring>
 #include <sstream>
+#include <algorithm>
+#include <cctype>
 
 /**
  * @brief 简单的 HTTP 服务器
@@ -86,15 +88,40 @@ public:
 
 private:
     void handle_client(int client_fd) {
-        char buffer[8192] = {0};
-        ssize_t bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
-        
-        if (bytes_read <= 0) {
+        std::string request;
+        char buffer[8192];
+        size_t header_end = std::string::npos;
+        size_t content_length = 0;
+        while (request.size() <= 1024 * 1024) {
+            const ssize_t bytes_read = read(client_fd, buffer, sizeof(buffer));
+            if (bytes_read <= 0) break;
+            request.append(buffer, static_cast<size_t>(bytes_read));
+            if (header_end == std::string::npos) {
+                header_end = request.find("\r\n\r\n");
+                if (header_end != std::string::npos) {
+                    std::istringstream headers(request.substr(0, header_end));
+                    std::string line;
+                    std::getline(headers, line);
+                    while (std::getline(headers, line)) {
+                        if (!line.empty() && line.back() == '\r') line.pop_back();
+                        const auto colon = line.find(':');
+                        if (colon == std::string::npos) continue;
+                        auto name = line.substr(0, colon);
+                        std::transform(name.begin(), name.end(), name.begin(),
+                            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                        if (name == "content-length") {
+                            content_length = static_cast<size_t>(std::stoull(line.substr(colon + 1)));
+                        }
+                    }
+                }
+            }
+            if (header_end != std::string::npos &&
+                request.size() >= header_end + 4 + content_length) break;
+        }
+        if (header_end == std::string::npos || request.size() < header_end + 4 + content_length) {
             close(client_fd);
             return;
         }
-        
-        std::string request(buffer, bytes_read);
         
         // 解析 HTTP 请求
         std::istringstream request_stream(request);
@@ -103,10 +130,7 @@ private:
         
         // 提取请求体
         std::string body;
-        size_t body_pos = request.find("\r\n\r\n");
-        if (body_pos != std::string::npos) {
-            body = request.substr(body_pos + 4);
-        }
+        body = request.substr(header_end + 4, content_length);
         
         // 查找处理器
         std::string response_body;
@@ -135,7 +159,12 @@ private:
         response << response_body;
         
         std::string response_str = response.str();
-        write(client_fd, response_str.c_str(), response_str.length());
+        size_t written = 0;
+        while (written < response_str.size()) {
+            const auto count = write(client_fd, response_str.data() + written, response_str.size() - written);
+            if (count <= 0) break;
+            written += static_cast<size_t>(count);
+        }
         
         close(client_fd);
     }

@@ -1,0 +1,82 @@
+{
+  "agents": [
+    {"id":"coder","name":"代码实现助手","skill":"coding","description":"实现功能、修改源码、补充单元测试和小范围重构","tags":["local","development"]},
+    {"id":"architect","name":"系统架构助手","skill":"architecture","description":"澄清需求、拆分模块、设计接口边界并评估技术风险","tags":["local","design"]},
+    {"id":"math","name":"数学计算助手","skill":"math","description":"处理代数、概率、数值计算、公式推导和结果校验","tags":["local","analysis"]},
+    {"id":"search","name":"资料检索助手","skill":"search","description":"查找公开资料、官方文档、论文和可信信息来源","tags":["local","research"]},
+    {"id":"reviewer","name":"代码审查助手","skill":"review","description":"检查缺陷、安全风险、越权访问、注入和代码质量","tags":["local","quality"]},
+    {"id":"ops","name":"运维诊断助手","skill":"operations","description":"分析监控告警、线上故障、日志、发布状态和回滚策略","tags":["local","production"]},
+    {"id":"writer","name":"内容写作助手","skill":"writing","description":"整理会议材料、技术说明、发布稿、摘要和结构化文档","tags":["local","content"]},
+    {"id":"data","name":"数据分析助手","skill":"data","description":"分析表格、指标、统计分布、趋势和异常数据","tags":["local","analytics"]}
+  ],
+  "queries": [
+    {"expected":"coder","query":"把这个接口补完整，再加上覆盖异常分支的测试"},
+    {"expected":"coder","query":"这个循环太慢了，请直接改成批量处理并验证结果"},
+    {"expected":"coder","query":"按现有风格把缺失的缓存类落地到仓库里"},
+    {"expected":"coder","query":"修掉空指针崩溃，给我可以提交的最小改动"},
+    {"expected":"coder","query":"根据设计稿完成实现并跑一遍构建"},
+
+    {"expected":"architect","query":"先不要动代码，帮我明确新模块由谁负责哪些事情"},
+    {"expected":"architect","query":"这个需求应该拆成几层，每层之间怎么交互"},
+    {"expected":"architect","query":"评估一下这次改造会影响哪些上下游以及主要风险"},
+    {"expected":"architect","query":"给出一个一周能完成的技术方案和验收边界"},
+    {"expected":"architect","query":"两个服务职责重叠了，先梳理合理的分层"},
+
+    {"expected":"math","query":"计算这组事件同时发生的概率并写出推导过程"},
+    {"expected":"math","query":"求这个矩阵的特征值并检查计算是否正确"},
+    {"expected":"math","query":"帮我解这个方程组，保留四位小数"},
+    {"expected":"math","query":"估算这个增长模型在第十二个月的结果"},
+    {"expected":"math","query":"证明这个递推式为什么会收敛"},
+
+    {"expected":"search","query":"找一下这个库最新版本的官方迁移指南"},
+    {"expected":"search","query":"帮我确认这个协议字段在规范原文里的定义"},
+    {"expected":"search","query":"有哪些论文讨论了多智能体之间的任务交接"},
+    {"expected":"search","query":"查一下 Ubuntu 上这个依赖应该安装哪个包"},
+    {"expected":"search","query":"给我几个可信来源说明这个行为是否符合标准"},
+
+    {"expected":"reviewer","query":"看一下这个提交有没有并发漏洞或资源泄漏"},
+    {"expected":"reviewer","query":"检查这段请求处理是否可能被构造输入绕过"},
+    {"expected":"reviewer","query":"这个补丁准备合并了，请重点找回归风险"},
+    {"expected":"reviewer","query":"帮我确认权限判断有没有漏掉边界条件"},
+    {"expected":"reviewer","query":"从可维护性角度指出这次改动最危险的地方"},
+
+    {"expected":"ops","query":"线上错误率突然升高，先判断是否需要回滚"},
+    {"expected":"ops","query":"服务启动后一直重启，请结合运行记录定位原因"},
+    {"expected":"ops","query":"发布完成后延迟翻倍了，应该先观察哪些指标"},
+    {"expected":"ops","query":"磁盘快满了，给出安全的排查和处置顺序"},
+    {"expected":"ops","query":"容器健康检查失败但进程还在，怎么进一步诊断"},
+
+    {"expected":"writer","query":"把这些零散会议记录整理成一份可发给团队的说明"},
+    {"expected":"writer","query":"将这次改造的背景和结论写成简洁的技术文章"},
+    {"expected":"writer","query":"把下面内容改写成面向用户的版本更新公告"},
+    {"expected":"writer","query":"根据讨论内容输出标题、摘要和行动项"},
+    {"expected":"writer","query":"帮我把项目经历组织成两分钟面试表达"},
+
+    {"expected":"data","query":"比较这两个月的转化指标并找出异常变化"},
+    {"expected":"data","query":"读取这份表格，统计各类别的均值和分位数"},
+    {"expected":"data","query":"画出请求耗时的分布并识别长尾"},
+    {"expected":"data","query":"判断这次实验的提升是否具有统计意义"},
+    {"expected":"data","query":"从这些业务数字里找出最值得关注的趋势"},
+
+    {"expected":null,"query":"明天下午三点提醒我去拿快递"},
+    {"expected":null,"query":"播放一首轻松的爵士乐"},
+    {"expected":null,"query":"把客厅空调温度调到二十四度"},
+    {"expected":null,"query":"帮我预订周末两个人的晚餐"},
+    {"expected":null,"query":"今天上海会不会下雨"},
+    {"expected":null,"query":"给家里的绿植制定浇水计划"},
+    {"expected":null,"query":"查询这个月的信用卡还款日"},
+    {"expected":null,"query":"帮我挑一双适合徒步的鞋"},
+    {"expected":null,"query":"生成一张海边日落的插画"},
+    {"expected":null,"query":"翻译这段法语对话并朗读出来"},
+    {"expected":null,"query":"把下周的牙医预约加入日历"},
+    {"expected":null,"query":"给同事发送生日祝福"},
+    {"expected":null,"query":"查看附近停车场还有没有空位"},
+    {"expected":null,"query":"控制扫地机器人清理卧室"},
+    {"expected":null,"query":"帮我计算这顿饭包含多少卡路里"},
+    {"expected":null,"query":"查一下这趟航班有没有晚点"},
+    {"expected":null,"query":"把照片中的背景换成白色"},
+    {"expected":null,"query":"推荐一部适合周末看的电影"},
+    {"expected":null,"query":"读取我的睡眠记录并给出健康建议"},
+    {"expected":null,"query":"打开车库门并确认门锁状态"}
+  ]
+}
