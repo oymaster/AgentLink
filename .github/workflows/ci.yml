@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+        build_type: [Debug, Release]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 固定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: tools/agentlink-mcp-server/package-lock.json
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libboost-all-dev libcurl4-openssl-dev libhiredis-dev redis-server pkg-config
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install boost hiredis redis pkg-config
+      - name: Start Redis
+        run: redis-server --daemonize yes
+      - name: Print toolchain versions
+        run: |
+          c++ --version
+          cmake --version
+          node --version
+          npm --version
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON -DBUILD_GATEWAY=ON
+      - name: Build
+        run: cmake --build build -j 4
+      - name: CTest
+        run: ctest --test-dir build --output-on-failure
+      - name: Build MCP bridge
+        working-directory: tools/agentlink-mcp-server
+        run: npm ci && npm run build
+      - name: Mock end-to-end demo
+        if: matrix.build_type == 'Release'
+        run: AGENTLINK_BUILD_DIR="$PWD/build" AGENTLINK_LOCAL_DEMO_BASE_PORT=18600 AGENTLINK_GATEWAY_PORT=18603 bash examples/multi_agent_demo/run_local_claude_codex_agents.sh
