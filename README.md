@@ -193,8 +193,6 @@ AGENTLINK_BUILD_DIR="$PWD/build" \
 - `stream_task` 当前读取每个任务的小型事件列表，再在内存中按 sequence 过滤。
 - 语义路由使用内存线性扫描，这是针对小规模 Agent 目录的主动选择。
 
-详细取舍见 [Gateway 关键决策](docs/hard_decisions.md)，最近一次本地证据见[验证结果](docs/verification_results.md)。
-
 ## 许可证
 
 AgentLink 项目代码采用 Apache-2.0；第三方文件保留各自原始许可证声明。
