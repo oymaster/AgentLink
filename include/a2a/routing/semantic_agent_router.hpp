@@ -14,6 +14,8 @@
 
 namespace a2a::routing {
 
+inline constexpr double kDefaultSemanticThreshold = 0.23;
+
 enum class EmbeddingInputType { Query, Document };
 
 class IEmbeddingProvider {
@@ -59,13 +61,13 @@ public:
         std::vector<AgentDescriptor> agents,
         std::string message,
         std::string tag,
-        double threshold = 0.30);
+        double threshold = kDefaultSemanticThreshold);
     boost::asio::awaitable<std::vector<SemanticRouteResult>> rank(
         std::vector<AgentDescriptor> agents,
         std::string message,
         std::string tag,
         std::size_t top_k,
-        double threshold = 0.30);
+        double threshold = kDefaultSemanticThreshold);
 
 private:
     struct CacheEntry {

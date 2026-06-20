@@ -118,7 +118,8 @@ void evaluate(const Dataset& dataset, std::unique_ptr<routing::IEmbeddingProvide
     const auto observations = future.get();
 
     std::size_t positives = 0, negatives = 0, recall1 = 0, recall3 = 0;
-    std::size_t routed_correct_at_030 = 0, false_routes_at_030 = 0, positive_abstentions_at_030 = 0;
+    std::size_t routed_correct_at_default = 0, false_routes_at_default = 0;
+    std::size_t positive_abstentions_at_default = 0;
     double reciprocal_rank = 0.0;
     std::vector<double> latencies;
     for (const auto& item : observations) {
@@ -128,11 +129,15 @@ void evaluate(const Dataset& dataset, std::unique_ptr<routing::IEmbeddingProvide
             if (item.expected_rank == 1) ++recall1;
             if (item.expected_rank > 0 && item.expected_rank <= 3) ++recall3;
             if (item.expected_rank > 0) reciprocal_rank += 1.0 / static_cast<double>(item.expected_rank);
-            if (item.top_semantic_score < 0.30) ++positive_abstentions_at_030;
-            if (item.top1_correct && item.top_semantic_score >= 0.30) ++routed_correct_at_030;
+            if (item.top_semantic_score < routing::kDefaultSemanticThreshold) {
+                ++positive_abstentions_at_default;
+            }
+            if (item.top1_correct && item.top_semantic_score >= routing::kDefaultSemanticThreshold) {
+                ++routed_correct_at_default;
+            }
         } else {
             ++negatives;
-            if (item.top_semantic_score >= 0.30) ++false_routes_at_030;
+            if (item.top_semantic_score >= routing::kDefaultSemanticThreshold) ++false_routes_at_default;
         }
     }
 
@@ -166,10 +171,10 @@ void evaluate(const Dataset& dataset, std::unique_ptr<routing::IEmbeddingProvide
               << " recall@1=" << ratio(recall1, positives)
               << " recall@3=" << ratio(recall3, positives)
               << " mrr=" << (positives == 0 ? 0.0 : reciprocal_rank / static_cast<double>(positives))
-              << " threshold=0.30"
-              << " routed_recall=" << ratio(routed_correct_at_030, positives)
-              << " false_route_rate=" << ratio(false_routes_at_030, negatives)
-              << " positive_abstentions=" << positive_abstentions_at_030
+              << " threshold=" << routing::kDefaultSemanticThreshold
+              << " routed_recall=" << ratio(routed_correct_at_default, positives)
+              << " false_route_rate=" << ratio(false_routes_at_default, negatives)
+              << " positive_abstentions=" << positive_abstentions_at_default
               << " recommended_threshold=" << recommended_threshold
               << " recommended_recall=" << recommended_recall
               << " cold_start_latency_ms=" << cold_start_latency
@@ -183,8 +188,9 @@ void evaluate(const Dataset& dataset, std::unique_ptr<routing::IEmbeddingProvide
                     {"expected", item.expected}, {"selected", item.selected},
                     {"score", item.top_semantic_score}, {"query", item.query}}.dump() << '\n';
             }
-            if (item.positive && item.top_semantic_score < 0.30) {
-                std::cout << json{{"provider", provider_name}, {"kind", "abstained_at_0.30"},
+            if (item.positive && item.top_semantic_score < routing::kDefaultSemanticThreshold) {
+                std::cout << json{{"provider", provider_name}, {"kind", "abstained_at_default_threshold"},
+                    {"threshold", routing::kDefaultSemanticThreshold},
                     {"expected", item.expected}, {"selected", item.selected},
                     {"score", item.top_semantic_score}, {"query", item.query}}.dump() << '\n';
             }
