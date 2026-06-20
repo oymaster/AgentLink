@@ -36,6 +36,9 @@ struct Observation {
     bool positive = false;
     bool top1_correct = false;
     int expected_rank = 0;
+    std::string query;
+    std::string expected;
+    std::string selected;
     double top_semantic_score = 0.0;
     double latency_ms = 0.0;
 };
@@ -93,6 +96,9 @@ void evaluate(const Dataset& dataset, std::unique_ptr<routing::IEmbeddingProvide
             const auto ranked = co_await router.rank(dataset.agents, query.text, "local", 3, 0.0);
             Observation observation;
             observation.positive = query.expected.has_value();
+            observation.query = query.text;
+            observation.expected = query.expected.value_or("");
+            observation.selected = ranked.empty() ? "" : ranked.front().agent.agent_id();
             observation.top_semantic_score = ranked.empty() ? 0.0 : ranked.front().semantic_score;
             observation.latency_ms = std::chrono::duration<double, std::milli>(
                 std::chrono::steady_clock::now() - started).count();
@@ -147,8 +153,12 @@ void evaluate(const Dataset& dataset, std::unique_ptr<routing::IEmbeddingProvide
         }
     }
 
-    const auto average_latency = latencies.empty() ? 0.0
-        : std::accumulate(latencies.begin(), latencies.end(), 0.0) / static_cast<double>(latencies.size());
+    const auto cold_start_latency = latencies.empty() ? 0.0 : latencies.front();
+    std::vector<double> warm_latencies;
+    if (latencies.size() > 1) warm_latencies.assign(latencies.begin() + 1, latencies.end());
+    const auto warm_average_latency = warm_latencies.empty() ? 0.0
+        : std::accumulate(warm_latencies.begin(), warm_latencies.end(), 0.0) /
+            static_cast<double>(warm_latencies.size());
     std::cout << std::fixed << std::setprecision(3)
               << "provider=" << provider_name
               << " positives=" << positives
@@ -162,8 +172,24 @@ void evaluate(const Dataset& dataset, std::unique_ptr<routing::IEmbeddingProvide
               << " positive_abstentions=" << positive_abstentions_at_030
               << " recommended_threshold=" << recommended_threshold
               << " recommended_recall=" << recommended_recall
-              << " avg_latency_ms=" << average_latency
-              << " p95_latency_ms=" << percentile95(std::move(latencies)) << '\n';
+              << " cold_start_latency_ms=" << cold_start_latency
+              << " warm_avg_latency_ms=" << warm_average_latency
+              << " warm_p95_latency_ms=" << percentile95(std::move(warm_latencies)) << '\n';
+
+    if (provider_name != "fake-token-hash-v1") {
+        for (const auto& item : observations) {
+            if (item.positive && !item.top1_correct) {
+                std::cout << json{{"provider", provider_name}, {"kind", "top1_miss"},
+                    {"expected", item.expected}, {"selected", item.selected},
+                    {"score", item.top_semantic_score}, {"query", item.query}}.dump() << '\n';
+            }
+            if (item.positive && item.top_semantic_score < 0.30) {
+                std::cout << json{{"provider", provider_name}, {"kind", "abstained_at_0.30"},
+                    {"expected", item.expected}, {"selected", item.selected},
+                    {"score", item.top_semantic_score}, {"query", item.query}}.dump() << '\n';
+            }
+        }
+    }
 }
 
 } // namespace

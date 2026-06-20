@@ -39,7 +39,7 @@ std::string hash_string(const std::string& value) {
 
 } // namespace
 
-std::vector<float> FakeEmbeddingProvider::embed(const std::string& text) {
+std::vector<float> FakeEmbeddingProvider::embed(const std::string& text, EmbeddingInputType) {
     std::vector<float> result(dimensions_, 0.0f);
     std::string token;
     auto add_token = [&] {
@@ -63,11 +63,12 @@ DashScopeEmbeddingProvider::DashScopeEmbeddingProvider(std::string api_key, long
     std::call_once(once, [] { curl_global_init(CURL_GLOBAL_DEFAULT); });
 }
 
-std::vector<float> DashScopeEmbeddingProvider::embed(const std::string& text) {
+std::vector<float> DashScopeEmbeddingProvider::embed(const std::string& text, EmbeddingInputType type) {
     std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), &curl_easy_cleanup);
     if (!curl) throw std::runtime_error("curl_easy_init failed");
+    const auto text_type = type == EmbeddingInputType::Query ? "query" : "document";
     const auto request = json{{"model", model()}, {"input", {{"texts", json::array({text})}}},
-                              {"parameters", {{"text_type", "query"}}}}.dump();
+                              {"parameters", {{"text_type", text_type}}}}.dump();
     std::string response;
     curl_slist* raw_headers = nullptr;
     raw_headers = curl_slist_append(raw_headers, "Content-Type: application/json");
@@ -105,8 +106,9 @@ SemanticAgentRouter::SemanticAgentRouter(std::unique_ptr<IEmbeddingProvider> pro
 
 SemanticAgentRouter::~SemanticAgentRouter() { pool_.join(); }
 
-std::vector<float> SemanticAgentRouter::embed_cached(const std::string& text) {
-    const auto key = provider_->model() + ":" + hash_string(text);
+std::vector<float> SemanticAgentRouter::embed_cached(const std::string& text, EmbeddingInputType type) {
+    const auto type_name = type == EmbeddingInputType::Query ? "query" : "document";
+    const auto key = provider_->model() + ":" + type_name + ":" + hash_string(text);
     const auto now = std::chrono::steady_clock::now();
     {
         std::lock_guard lock(mutex_);
@@ -120,7 +122,7 @@ std::vector<float> SemanticAgentRouter::embed_cached(const std::string& text) {
             cache_.erase(it);
         }
     }
-    auto value = provider_->embed(text);
+    auto value = provider_->embed(text, type);
     {
         std::lock_guard lock(mutex_);
         while (cache_.size() >= cache_capacity_) {
@@ -172,7 +174,8 @@ asio::awaitable<std::vector<SemanticRouteResult>> SemanticAgentRouter::rank(
                     live.insert(key);
                     auto found = index_.find(key);
                     if (found == index_.end() || found->second.content_hash != content_hash) {
-                        index_[key] = IndexEntry{agent, content_hash, embed_cached(document)};
+                        index_[key] = IndexEntry{
+                            agent, content_hash, embed_cached(document, EmbeddingInputType::Document)};
                     } else {
                         found->second.agent = agent;
                     }
@@ -181,7 +184,7 @@ asio::awaitable<std::vector<SemanticRouteResult>> SemanticAgentRouter::rank(
             for (auto it = index_.begin(); it != index_.end();) {
                 if (!live.contains(it->first)) it = index_.erase(it); else ++it;
             }
-            const auto query = embed_cached(message);
+            const auto query = embed_cached(message, EmbeddingInputType::Query);
             std::vector<SemanticRouteResult> ranked;
             for (const auto& [_, entry] : index_) {
                 const auto semantic = cosine(query, entry.embedding);

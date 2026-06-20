@@ -14,18 +14,20 @@
 
 namespace a2a::routing {
 
+enum class EmbeddingInputType { Query, Document };
+
 class IEmbeddingProvider {
 public:
     virtual ~IEmbeddingProvider() = default;
     virtual std::string model() const = 0;
-    virtual std::vector<float> embed(const std::string& text) = 0;
+    virtual std::vector<float> embed(const std::string& text, EmbeddingInputType type) = 0;
 };
 
 class FakeEmbeddingProvider final : public IEmbeddingProvider {
 public:
     explicit FakeEmbeddingProvider(std::size_t dimensions = 256) : dimensions_(dimensions) {}
     std::string model() const override { return "fake-token-hash-v1"; }
-    std::vector<float> embed(const std::string& text) override;
+    std::vector<float> embed(const std::string& text, EmbeddingInputType type) override;
 private:
     std::size_t dimensions_;
 };
@@ -34,7 +36,7 @@ class DashScopeEmbeddingProvider final : public IEmbeddingProvider {
 public:
     DashScopeEmbeddingProvider(std::string api_key, long timeout_ms);
     std::string model() const override { return "text-embedding-v2"; }
-    std::vector<float> embed(const std::string& text) override;
+    std::vector<float> embed(const std::string& text, EmbeddingInputType type) override;
 private:
     std::string api_key_;
     long timeout_ms_;
@@ -77,7 +79,7 @@ private:
         std::vector<float> embedding;
     };
 
-    std::vector<float> embed_cached(const std::string& text);
+    std::vector<float> embed_cached(const std::string& text, EmbeddingInputType type);
     static std::string document_for(const AgentDescriptor& agent, const AgentSkillDescriptor& skill);
     static double cosine(const std::vector<float>& lhs, const std::vector<float>& rhs);
 
