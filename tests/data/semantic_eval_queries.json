@@ -1,13 +1,13 @@
 {
   "agents": [
-    {"id":"coder","name":"代码实现助手","skill":"coding","description":"实现功能、修改源码、补充单元测试和小范围重构","tags":["local","development"]},
-    {"id":"architect","name":"系统架构助手","skill":"architecture","description":"澄清需求、拆分模块、设计接口边界并评估技术风险","tags":["local","design"]},
-    {"id":"math","name":"数学计算助手","skill":"math","description":"处理代数、概率、数值计算、公式推导和结果校验","tags":["local","analysis"]},
-    {"id":"search","name":"资料检索助手","skill":"search","description":"查找公开资料、官方文档、论文和可信信息来源","tags":["local","research"]},
-    {"id":"reviewer","name":"代码审查助手","skill":"review","description":"检查缺陷、安全风险、越权访问、注入和代码质量","tags":["local","quality"]},
-    {"id":"ops","name":"运维诊断助手","skill":"operations","description":"分析监控告警、线上故障、日志、发布状态和回滚策略","tags":["local","production"]},
-    {"id":"writer","name":"内容写作助手","skill":"writing","description":"整理会议材料、技术说明、发布稿、摘要和结构化文档","tags":["local","content"]},
-    {"id":"data","name":"数据分析助手","skill":"data","description":"分析表格、指标、统计分布、趋势和异常数据","tags":["local","analytics"]}
+    {"id":"coder","name":"代码实现助手","skill":"coding","description":"直接修改源码并交付可编译补丁；实现接口、修复崩溃、优化循环、落地缓存类、补充单元测试并运行构建验证","tags":["local","development"]},
+    {"id":"architect","name":"系统架构助手","skill":"architecture","description":"在动代码前澄清需求和边界；拆分模块职责、设计接口交互、梳理上下游影响、制定一周技术方案和验收标准","tags":["local","design"]},
+    {"id":"math","name":"数学计算助手","skill":"math","description":"执行数学和数值推导；计算概率、矩阵特征值、方程组、增长模型、递推收敛并校验公式结果","tags":["local","analysis"]},
+    {"id":"search","name":"资料检索助手","skill":"search","description":"查找并引用外部可信资料；确认官方规范字段、库版本迁移指南、论文资料、Ubuntu 依赖包和标准原文来源","tags":["local","research"]},
+    {"id":"reviewer","name":"代码审查助手","skill":"review","description":"审查已有代码或补丁并输出风险清单；重点发现并发漏洞、资源泄漏、输入绕过、权限边界、回归风险和可维护性问题","tags":["local","quality"]},
+    {"id":"ops","name":"运维诊断助手","skill":"operations","description":"处理线上运行态问题；分析错误率、重启、延迟、磁盘、容器健康检查、监控日志、发布状态并给出回滚或处置顺序","tags":["local","production"]},
+    {"id":"writer","name":"内容写作助手","skill":"writing","description":"产出面向人的文字材料；整理会议记录、技术文章、版本公告、标题摘要行动项和两分钟面试表达","tags":["local","content"]},
+    {"id":"data","name":"数据分析助手","skill":"data","description":"分析结构化数据和指标；读取表格、比较转化指标、统计均值分位数、识别耗时分布长尾、判断实验显著性和业务趋势","tags":["local","analytics"]}
   ],
   "queries": [
     {"expected":"coder","query":"把这个接口补完整，再加上覆盖异常分支的测试"},

@@ -121,7 +121,7 @@ private:
     void register_self() {
         AgentSkillDescriptor skill;
         skill.name = skill_;
-        skill.description = "CLI-backed role agent: " + name_;
+        skill.description = "CLI-backed role agent: " + name_ + ". Role capability: " + role_prompt_;
         skill.input_modes = {"text"};
         skill.output_modes = {"text"};
 
