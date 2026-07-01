@@ -24,6 +24,14 @@ jobs:
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libboost-all-dev libcurl4-openssl-dev libhiredis-dev redis-server pkg-config
+      - name: Select g++-14 (Linux)
+        if: runner.os == 'Linux'
+        # GCC 13 (the default g++ on ubuntu-24.04) ICEs in morph_fn_to_coro on
+        # the coroutine lambda in task_engine.cpp. g++-14 lowers it correctly.
+        run: |
+          sudo apt-get install -y g++-14
+          echo "CC=gcc-14" >> "$GITHUB_ENV"
+          echo "CXX=g++-14" >> "$GITHUB_ENV"
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: brew install boost hiredis redis pkg-config

@@ -66,6 +66,7 @@ private:
     boost::asio::awaitable<bool> claim_terminal(const std::string& task_id, State state);
     boost::asio::awaitable<void> erase_control(const std::string& task_id);
     void on_run_finished();
+    void on_task_finished(std::exception_ptr error);
     boost::asio::awaitable<void> fail_task(const std::string& task_id, const std::string& trace_id,
                                            const std::string& context_id, nlohmann::json payload);
     static TaskEvent event(TaskEventType type, const std::string& task_id, const std::string& trace_id,

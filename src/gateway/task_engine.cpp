@@ -76,13 +76,7 @@ asio::awaitable<json> TaskEngine::create_task(CreateTaskInput input) {
             return self->run_task(std::move(input), task_id, trace_id, context_id, signal);
         }, asio::bind_cancellation_slot(signal->slot(),
             [self](std::exception_ptr error) {
-                if (error) {
-                    try { std::rethrow_exception(error); }
-                    catch (const std::exception& exception) {
-                        std::cerr << "task coroutine failed: " << exception.what() << '\n';
-                    }
-                }
-                self->on_run_finished();
+                self->on_task_finished(error);
             }));
     co_return json{{"taskId", task_id}, {"traceId", trace_id}, {"contextId", context_id}, {"state", "created"}};
 }
@@ -117,6 +111,16 @@ void TaskEngine::on_run_finished() {
             self->drain_timer_.cancel();
         }
     });
+}
+
+void TaskEngine::on_task_finished(std::exception_ptr error) {
+    if (error) {
+        try { std::rethrow_exception(error); }
+        catch (const std::exception& exception) {
+            std::cerr << "task coroutine failed: " << exception.what() << '\n';
+        }
+    }
+    on_run_finished();
 }
 
 asio::awaitable<std::optional<TaskEngine::Selection>> TaskEngine::select_agent(
